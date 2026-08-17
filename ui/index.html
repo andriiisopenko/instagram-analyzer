@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Run saved-session Instagram relationship analyses and review checked history.">
+  <title>Instagram Analyzer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Instagram Analyzer home">
+      <span class="brand-mark" aria-hidden="true">IA</span>
+      <span>Instagram Analyzer</span>
+    </a>
+    <span class="header-note">Saved-session analysis</span>
+  </header>
+
+  <main>
+    <section id="analysis-view" class="view" aria-labelledby="analysis-title">
+      <div class="intro">
+        <p class="eyebrow">New analysis</p>
+        <h1 id="analysis-title">Find the accounts that do not follow back.</h1>
+        <p class="lede">Choose a saved login and target profile. Existing sessions, history, checked markers, and TXT reports stay in use.</p>
+      </div>
+
+      <form id="analysis-form" class="analysis-form">
+        <section class="form-card" aria-labelledby="account-heading">
+          <div class="card-heading">
+            <span class="step">01</span>
+            <div>
+              <h2 id="account-heading">Saved login account</h2>
+              <p>The private session used to access Instagram.</p>
+            </div>
+          </div>
+          <div class="field-row">
+            <label class="field grow">
+              <span>Account</span>
+              <select id="account-id" name="account_id" required>
+                <option value="">Loading saved accounts…</option>
+              </select>
+            </label>
+            <button id="delete-account" class="button button-secondary delete-button" type="button" disabled>Remove</button>
+          </div>
+          <p id="account-help" class="field-help" aria-live="polite"></p>
+        </section>
+
+        <section class="form-card" aria-labelledby="target-heading">
+          <div class="card-heading">
+            <span class="step">02</span>
+            <div>
+              <h2 id="target-heading">Target Instagram account</h2>
+              <p>Use a username, @username, or direct Instagram profile URL.</p>
+            </div>
+          </div>
+          <label class="field">
+            <span>Target profile</span>
+            <input id="target-username" name="target_username" type="text" autocomplete="off" spellcheck="false" placeholder="@username" required>
+          </label>
+        </section>
+
+        <section class="form-card" aria-labelledby="options-heading">
+          <div class="card-heading">
+            <span class="step">03</span>
+            <div>
+              <h2 id="options-heading">Analysis options</h2>
+              <p>All currently available parameters are shown here.</p>
+            </div>
+          </div>
+          <div id="analysis-types" class="option-grid">
+            <label class="option-card">
+              <input type="radio" name="analysis_type" value="non_followers" checked>
+              <span class="option-copy">
+                <strong>Non-followers</strong>
+                <small>Following minus followers</small>
+              </span>
+              <span class="option-check" aria-hidden="true"></span>
+            </label>
+            <div class="option-card option-fixed">
+              <span class="option-copy">
+                <strong>History markers</strong>
+                <small>Previously seen accounts get [checked]</small>
+              </span>
+              <span class="fixed-label">Always on</span>
+            </div>
+            <div class="option-card option-fixed">
+              <span class="option-copy">
+                <strong>Reports</strong>
+                <small>Timestamped TXT + standalone HTML</small>
+              </span>
+              <span class="fixed-label">Always on</span>
+            </div>
+          </div>
+        </section>
+
+        <div id="form-error" class="notice" role="alert" hidden></div>
+        <button id="analyze-button" class="button button-primary analyze-button" type="submit">Analyze</button>
+      </form>
+    </section>
+
+    <section id="progress-view" class="view compact-view" aria-labelledby="progress-title" hidden>
+      <p class="eyebrow">Analysis in progress</p>
+      <h1 id="progress-title">Working through the account data.</h1>
+      <div class="progress-card" aria-live="polite">
+        <div class="progress-meta">
+          <span id="progress-message">Waiting to start</span>
+          <strong id="progress-percent">0%</strong>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span id="progress-bar"></span>
+        </div>
+        <p>Keep this page open. Larger accounts can take a while and Instagram may pause requests.</p>
+      </div>
+    </section>
+
+    <section id="results-view" class="view" aria-labelledby="results-title" hidden>
+      <div class="results-toolbar">
+        <div>
+          <p class="eyebrow">Analysis complete</p>
+          <h1 id="results-title">Results for <span id="result-target"></span></h1>
+          <p id="result-meta" class="lede"></p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="new-analysis" class="button button-secondary" type="button">New Analysis</button>
+          <button id="html-report" class="button button-primary" type="button">HTML Report</button>
+        </div>
+      </div>
+
+      <div id="statistics" class="stats-grid" aria-label="Analysis statistics"></div>
+
+      <div class="result-lists">
+        <section class="list-card list-card-wide">
+          <div class="list-heading"><h2>Non-followers</h2><span id="all-count"></span></div>
+          <div id="all-accounts" class="account-list"></div>
+        </section>
+        <section class="list-card">
+          <div class="list-heading"><h2>New</h2><span id="new-count"></span></div>
+          <div id="new-accounts" class="account-list"></div>
+        </section>
+        <section class="list-card">
+          <div class="list-heading"><h2>Previously checked</h2><span id="checked-count"></span></div>
+          <div id="checked-accounts" class="account-list"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

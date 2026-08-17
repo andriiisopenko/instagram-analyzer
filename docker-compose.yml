@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    init: true
+    restart: unless-stopped
+    user: "${DOCKER_UID:-501}:${DOCKER_GID:-20}"
+    environment:
+      HOME: /tmp
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./reports:/app/reports
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
