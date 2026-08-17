@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import (
+from playwright.async_api import (
     Browser,
     BrowserContext,
     Error as PlaywrightError,
     Page,
     Playwright,
-    sync_playwright,
+    async_playwright,
 )
 
 
@@ -176,24 +177,33 @@ def load_saved_browser_session(
     session_path: Path,
 ) -> list[CookieData]:
     """Load a saved Playwright state and return validated Instagram cookies."""
+    return asyncio.run(_load_saved_browser_session(browser_option, session_path))
+
+
+async def _load_saved_browser_session(
+    browser_option: BrowserOption,
+    session_path: Path,
+) -> list[CookieData]:
     try:
-        with sync_playwright() as playwright:
+        async with async_playwright() as playwright:
             browser: Browser | None = None
             context: BrowserContext | None = None
             page: Page | None = None
             try:
-                browser = _launch_browser(playwright, browser_option, headless=True)
-                context = browser.new_context(storage_state=str(session_path))
-                page = context.new_page()
-                if not _validate_authenticated_context(context, page):
+                browser = await _launch_browser(
+                    playwright, browser_option, headless=True
+                )
+                context = await browser.new_context(storage_state=str(session_path))
+                page = await context.new_page()
+                if not await _validate_authenticated_context(context, page):
                     raise SavedSessionExpiredError
-                return _instagram_cookies(context)
+                return await _instagram_cookies(context)
             except SavedSessionExpiredError:
                 raise
             except PlaywrightError:
                 raise SavedSessionExpiredError from None
             finally:
-                _close_playwright_resources(page, context, browser)
+                await _close_playwright_resources(context, browser)
     except SavedSessionExpiredError:
         raise
     except PlaywrightError:
@@ -208,16 +218,35 @@ def perform_manual_browser_login(
     timeout_seconds: int = DEFAULT_LOGIN_TIMEOUT_SECONDS,
 ) -> list[CookieData]:
     """Launch a headed browser and wait for the user to authenticate manually."""
+    return asyncio.run(
+        _perform_manual_browser_login(
+            browser_option,
+            session_path,
+            status=status,
+            timeout_seconds=timeout_seconds,
+        )
+    )
+
+
+async def _perform_manual_browser_login(
+    browser_option: BrowserOption,
+    session_path: Path,
+    *,
+    status: StatusWriter,
+    timeout_seconds: int,
+) -> list[CookieData]:
     try:
-        with sync_playwright() as playwright:
+        async with async_playwright() as playwright:
             browser: Browser | None = None
             context: BrowserContext | None = None
             page: Page | None = None
             try:
-                browser = _launch_browser(playwright, browser_option, headless=False)
-                context = browser.new_context(no_viewport=True)
-                page = context.new_page()
-                page.goto(
+                browser = await _launch_browser(
+                    playwright, browser_option, headless=False
+                )
+                context = await browser.new_context(no_viewport=True)
+                page = await context.new_page()
+                await page.goto(
                     INSTAGRAM_LOGIN_URL,
                     wait_until="domcontentloaded",
                     timeout=30_000,
@@ -232,7 +261,7 @@ def perform_manual_browser_login(
                 status("")
                 status("Waiting for successful Instagram login...")
 
-                _wait_for_successful_login(
+                await _wait_for_successful_login(
                     browser,
                     context,
                     page,
@@ -242,20 +271,20 @@ def perform_manual_browser_login(
                 status("Saving session...")
                 session_path.parent.mkdir(parents=True, exist_ok=True)
                 session_path.parent.chmod(0o700)
-                context.storage_state(path=str(session_path))
+                await context.storage_state(path=str(session_path))
                 session_path.chmod(0o600)
-                cookies = _instagram_cookies(context)
+                cookies = await _instagram_cookies(context)
                 status("Session saved.")
                 return cookies
             finally:
-                _close_playwright_resources(page, context, browser)
+                await _close_playwright_resources(context, browser)
     except (BrowserClosedError, LoginTimeoutError):
         raise
     except PlaywrightError:
         raise BrowserLaunchError(browser_option.display_name) from None
 
 
-def _launch_browser(
+async def _launch_browser(
     playwright: Playwright,
     browser_option: BrowserOption,
     *,
@@ -267,10 +296,10 @@ def _launch_browser(
         launch_options["channel"] = browser_option.channel
     else:
         launch_options["executable_path"] = str(browser_option.executable_path)
-    return browser_type.launch(**launch_options)
+    return await browser_type.launch(**launch_options)
 
 
-def _wait_for_successful_login(
+async def _wait_for_successful_login(
     browser: Browser,
     context: BrowserContext,
     page: Page,
@@ -283,13 +312,12 @@ def _wait_for_successful_login(
             if not browser.is_connected() or page.is_closed():
                 raise BrowserClosedError
 
-            if _has_instagram_session_cookie(context) and _is_authenticated_url(
-                page.url
-            ):
-                if _validate_authenticated_context(context, page):
+            has_session = await _has_instagram_session_cookie(context)
+            if has_session and _is_authenticated_url(page.url):
+                if await _validate_authenticated_context(context, page):
                     return
 
-            page.wait_for_timeout(LOGIN_POLL_INTERVAL_MILLISECONDS)
+            await page.wait_for_timeout(LOGIN_POLL_INTERVAL_MILLISECONDS)
         except BrowserClosedError:
             raise
         except PlaywrightError:
@@ -298,35 +326,37 @@ def _wait_for_successful_login(
     raise LoginTimeoutError
 
 
-def _validate_authenticated_context(
+async def _validate_authenticated_context(
     context: BrowserContext,
     page: Page,
 ) -> bool:
-    if not _has_instagram_session_cookie(context):
+    if not await _has_instagram_session_cookie(context):
         return False
     try:
-        page.goto(
+        await page.goto(
             INSTAGRAM_SESSION_CHECK_URL,
             wait_until="domcontentloaded",
             timeout=30_000,
         )
     except PlaywrightError:
         return False
-    return _is_authenticated_url(page.url) and _has_instagram_session_cookie(context)
+    return _is_authenticated_url(page.url) and await _has_instagram_session_cookie(
+        context
+    )
 
 
-def _instagram_cookies(context: BrowserContext) -> list[CookieData]:
+async def _instagram_cookies(context: BrowserContext) -> list[CookieData]:
     return [
         cookie
-        for cookie in context.cookies(["https://www.instagram.com/"])
+        for cookie in await context.cookies(["https://www.instagram.com/"])
         if _is_instagram_domain(str(cookie.get("domain", "")))
     ]
 
 
-def _has_instagram_session_cookie(context: BrowserContext) -> bool:
+async def _has_instagram_session_cookie(context: BrowserContext) -> bool:
     return any(
         cookie.get("name") == "sessionid" and cookie.get("value")
-        for cookie in _instagram_cookies(context)
+        for cookie in await _instagram_cookies(context)
     )
 
 
@@ -363,30 +393,31 @@ def _find_browser_executable(system_path: Path) -> Path | None:
 
 
 def _find_playwright_chromium() -> Path | None:
+    return asyncio.run(_find_playwright_chromium_async())
+
+
+async def _find_playwright_chromium_async() -> Path | None:
     try:
-        with sync_playwright() as playwright:
+        async with async_playwright() as playwright:
             executable_path = Path(playwright.chromium.executable_path)
     except PlaywrightError:
         return None
     return executable_path if executable_path.is_file() else None
 
 
-def _close_playwright_resources(
-    page: Page | None,
+async def _close_playwright_resources(
     context: BrowserContext | None,
     browser: Browser | None,
 ) -> None:
-    if page is not None and not page.is_closed():
-        _close_resource(page)
     if context is not None:
-        _close_resource(context)
+        await _close_resource(context)
     if browser is not None and browser.is_connected():
-        _close_resource(browser)
+        await _close_resource(browser)
 
 
-def _close_resource(resource: Page | BrowserContext | Browser) -> None:
+async def _close_resource(resource: BrowserContext | Browser) -> None:
     try:
-        resource.close()
+        await resource.close()
     except PlaywrightError as error:
         if type(error).__name__ != "TargetClosedError":
             raise
