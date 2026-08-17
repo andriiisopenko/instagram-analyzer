@@ -1,18 +1,44 @@
-"""Instaloader authentication and local session handling."""
+"""Manual Playwright authentication integrated with Instaloader."""
 
 from __future__ import annotations
 
-import getpass
-import pickle
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import instaloader
+
+from instagram_analyzer.browser_auth import (
+    BrowserAuthenticationError,
+    BrowserLaunchError,
+    BrowserOption,
+    NoSupportedBrowserError,
+    SavedSessionExpiredError,
+    detect_installed_browsers,
+    load_saved_browser_session,
+    perform_manual_browser_login,
+)
 
 
 StatusWriter = Callable[[str], None]
 InputReader = Callable[[str], str]
-PasswordReader = Callable[[str], str]
+CookieData = dict[str, Any]
+
+
+class AuthenticationCancelledError(BrowserAuthenticationError):
+    """Raised when the user cancels browser authentication."""
+
+    def __init__(self) -> None:
+        super().__init__("Authentication cancelled.")
+
+
+class SessionIntegrationError(BrowserAuthenticationError):
+    """Raised when Playwright state cannot authenticate Instaloader."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Instagram authentication could not be transferred to the analyzer."
+        )
 
 
 def create_loader() -> instaloader.Instaloader:
@@ -31,53 +57,102 @@ def create_loader() -> instaloader.Instaloader:
 
 
 def authenticate(
-    login_username: str,
     *,
-    session_directory: Path = Path("sessions"),
+    session_path: Path = Path("sessions/instagram_storage_state.json"),
     status: StatusWriter = print,
     input_reader: InputReader = input,
-    password_reader: PasswordReader = getpass.getpass,
 ) -> instaloader.Instaloader:
-    """Load a valid session or authenticate interactively and save a new session."""
-    session_directory.mkdir(parents=True, exist_ok=True)
-    session_directory.chmod(0o700)
-    session_path = session_directory / f"session-{login_username}"
-    loader = create_loader()
+    """Reuse a Playwright state or launch one manual browser login."""
+    session_path.parent.mkdir(parents=True, exist_ok=True)
+    session_path.parent.chmod(0o700)
+    browsers = detect_installed_browsers()
 
     status("Checking saved session...")
     if session_path.is_file():
-        status("Session found.")
+        status("Saved session found.")
         status("Validating session...")
+        if not browsers:
+            raise NoSupportedBrowserError
         try:
-            loader.load_session_from_file(login_username, str(session_path))
-            authenticated_as = loader.test_login()
-        except (OSError, ValueError, EOFError, pickle.UnpicklingError):
-            authenticated_as = None
-
-        if authenticated_as and authenticated_as.casefold() == login_username.casefold():
-            status("Login successful.")
+            cookies = load_saved_browser_session(browsers[0], session_path)
+            loader, authenticated_username = _create_authenticated_loader(cookies)
+        except (SavedSessionExpiredError, SessionIntegrationError):
+            status("Session expired.")
+            session_path.unlink(missing_ok=True)
+        except BrowserLaunchError as error:
+            status(str(error))
+            status("No valid saved session found.")
+        else:
+            status("Session is valid.")
+            status(f"Authenticated as @{authenticated_username}.")
             return loader
-
-        status("Saved session is invalid or expired. Logging in again.")
-        loader = create_loader()
     else:
-        status("No saved session found.")
+        status("No valid saved session found.")
 
-    password = password_reader("Password: ")
-    if not password:
-        raise ValueError("Password cannot be empty.")
+    if not browsers:
+        raise NoSupportedBrowserError
 
-    status("Logging in...")
+    browser_option = _choose_browser(browsers, input_reader, status)
+    cookies = perform_manual_browser_login(
+        browser_option,
+        session_path,
+        status=status,
+    )
     try:
-        loader.login(login_username, password)
-    except instaloader.TwoFactorAuthRequiredException:
-        status("Two-factor authentication required.")
-        two_factor_code = input_reader("Enter 2FA code: ").strip()
-        if not two_factor_code:
-            raise ValueError("2FA code cannot be empty.") from None
-        loader.two_factor_login(two_factor_code)
+        loader, authenticated_username = _create_authenticated_loader(cookies)
+    except SessionIntegrationError:
+        session_path.unlink(missing_ok=True)
+        raise
+    finally:
+        cookies.clear()
 
-    loader.save_session_to_file(str(session_path))
-    session_path.chmod(0o600)
-    status("Login successful.")
+    status(f"Authenticated as @{authenticated_username}.")
     return loader
+
+
+def _create_authenticated_loader(
+    cookies: list[CookieData],
+) -> tuple[instaloader.Instaloader, str]:
+    loader = create_loader()
+    instagram_cookie_values = {
+        str(cookie["name"]): str(cookie["value"])
+        for cookie in cookies
+        if _is_instagram_domain(str(cookie.get("domain", "")))
+    }
+    if not instagram_cookie_values:
+        raise SessionIntegrationError
+
+    loader.context.update_cookies(instagram_cookie_values)
+    authenticated_username = loader.test_login()
+    if not authenticated_username:
+        raise SessionIntegrationError
+    loader.context.username = authenticated_username
+    return loader, authenticated_username
+
+
+def _choose_browser(
+    browsers: list[BrowserOption],
+    input_reader: InputReader,
+    status: StatusWriter,
+) -> BrowserOption:
+    status("")
+    status("Choose browser:")
+    status("")
+    for index, browser in enumerate(browsers, start=1):
+        status(f"{index}. {browser.display_name}")
+    status("0. Cancel")
+
+    while True:
+        choice = input_reader("\n> ").strip()
+        if choice == "0":
+            raise AuthenticationCancelledError
+        if choice.isdigit() and 1 <= int(choice) <= len(browsers):
+            return browsers[int(choice) - 1]
+        status("Invalid choice. Enter a number shown in the menu.")
+
+
+def _is_instagram_domain(domain: str) -> bool:
+    normalized_domain = domain.lstrip(".").casefold()
+    return normalized_domain == "instagram.com" or normalized_domain.endswith(
+        ".instagram.com"
+    )

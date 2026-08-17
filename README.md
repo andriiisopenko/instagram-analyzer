@@ -5,9 +5,10 @@ A small Python CLI application that finds accounts a target Instagram profile fo
 ## MVP features
 
 - Accepts a profile URL, `@username`, or plain username.
-- Authenticates with an Instagram username and a hidden password prompt.
-- Supports Instagram two-factor authentication.
-- Reuses local Instaloader session files after validating them.
+- Authenticates through a visible browser launched by Playwright.
+- Supports installed Chrome, Chromium, Firefox, Brave, and Edge browsers on macOS.
+- Lets the user complete passwords, 2FA, checkpoints, and confirmations in Instagram itself.
+- Reuses a local Playwright authentication state after validating it.
 - Collects following and follower usernames with progress bars.
 - Calculates non-followers with set comparison.
 - Prints a numbered result and saves an unnumbered TXT file.
@@ -44,9 +45,33 @@ Run the interactive CLI:
 python main.py
 ```
 
-Enter the target profile as an Instagram URL, `@username`, or username. Then enter the username of the Instagram account used for authentication. Password input is hidden.
+Enter the target profile as an Instagram URL, `@username`, or username.
 
-If Instagram requires two-factor authentication, the application asks for the current 2FA code. Passwords and 2FA codes are never written to disk. After a successful login, the Instaloader session cookie is stored in `sessions/session-<username>` with restricted file permissions. The `sessions/` directory is ignored by Git.
+## Authentication
+
+Authentication uses this flow:
+
+1. A saved Playwright Instagram session is validated and reused when possible.
+2. If no valid session exists, the application detects supported browsers installed on the Mac.
+3. The selected browser opens Instagram in a visible Playwright-controlled window.
+4. The user completes the entire login manually in Instagram.
+5. The authenticated browser state is saved and transferred to Instaloader for the existing analysis.
+
+The terminal never asks for or stores an Instagram password or 2FA code. The application does not autofill credentials, read cookies from an existing browser profile, or bypass Instagram security checks.
+
+### Manual browser authentication on macOS
+
+1. Run `python main.py`.
+2. Choose one of the detected browsers.
+3. Log in manually in the browser window opened by the application.
+4. Complete any 2FA, checkpoint, or device confirmation requested by Instagram.
+5. Keep the browser open until the application confirms authentication.
+
+The application uses Playwright and supports Google Chrome, Chromium, Firefox, Brave Browser, and Microsoft Edge when detected. If none is installed, Playwright-managed Chromium can be installed with `python -m playwright install chromium`. Safari is not offered because Playwright cannot reliably launch the installed Safari application. No Full Disk Access or browser cookie database access is required.
+
+After successful login, Playwright saves the browser authentication state to `sessions/instagram_storage_state.json` with restricted permissions. Future launches create an isolated Playwright context from that state, validate it with Instagram, and continue without another login when it remains valid. Expired state is removed and replaced after a new manual login. The `sessions/` directory is ignored by Git.
+
+The saved state contains sensitive browser authentication data. Never share or commit it.
 
 Example:
 
@@ -60,11 +85,28 @@ Target profile:
 
 Target: @example
 
-Instagram login: my_account
-Password:
+Checking saved session...
+No valid saved session found.
 
-Logging in...
-Login successful.
+Choose browser:
+
+1. Google Chrome
+2. Firefox
+3. Brave Browser
+0. Cancel
+
+> 1
+
+Browser opened.
+
+Log in to Instagram manually in the browser.
+Complete any 2FA, security check, checkpoint, or confirmation requested by Instagram.
+
+Waiting for successful Instagram login...
+Instagram login successful.
+Saving session...
+Session saved.
+Authenticated as @my_account.
 
 Loading @example...
 
@@ -107,6 +149,7 @@ instagram-analyzer/
 │   ├── __init__.py
 │   ├── analyzer.py
 │   ├── auth.py
+│   ├── browser_auth.py
 │   ├── output.py
 │   ├── profile.py
 │   ├── rate_limit.py

@@ -8,6 +8,7 @@ import instaloader
 
 from instagram_analyzer.analyzer import find_non_followers
 from instagram_analyzer.auth import authenticate
+from instagram_analyzer.browser_auth import BrowserAuthenticationError
 from instagram_analyzer.output import (
     print_numbered_usernames,
     print_summary,
@@ -36,9 +37,7 @@ def run() -> int:
         target_username = normalize_username(input("Target profile:\n> "))
         print(f"\nTarget: @{target_username}\n")
 
-        login_username = normalize_username(input("Instagram login: "))
-        print()
-        loader = authenticate(login_username)
+        loader = authenticate()
 
         print(f"\nLoading @{target_username}...")
         target_profile = resolve_profile(loader, target_username)
@@ -67,6 +66,8 @@ def run() -> int:
     except (EOFError, KeyboardInterrupt):
         print("\nOperation cancelled.", file=sys.stderr)
     except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+    except BrowserAuthenticationError as error:
         print(f"Error: {error}", file=sys.stderr)
     except instaloader.BadCredentialsException:
         print("Error: Incorrect password or invalid 2FA code.", file=sys.stderr)

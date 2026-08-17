@@ -1,4 +1,4 @@
 instaloader>=4.12,<5
+playwright>=1.50,<2
 tqdm>=4.66,<5
 pytest>=8,<9
-
