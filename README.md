@@ -2,6 +2,8 @@
 
 A local web application and CLI that find accounts a target Instagram profile follows but that do not follow it back. Both interfaces share the same saved accounts, Playwright sessions, SQLite history, `[checked]` markers, and TXT reports.
 
+![Instagram Analyzer UI](https://github.com/andriiisopenko/instagram-analyzer/blob/13ca11b45b08d2edf4a924e8c9be424671cd3df5/img/image.png)
+
 ## Ways to run
 
 The application has two supported interfaces. They use the same business logic and persistent data, but the CLI provides more interactive choices around account selection and analysis setup.
