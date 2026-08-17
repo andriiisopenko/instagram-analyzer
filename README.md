@@ -1,8 +1,25 @@
 # Instagram Analyzer
 
-A local web application and CLI that find accounts a target Instagram profile follows but that do not follow it back. The existing Instaloader, Playwright sessions, SQLite history, `[checked]` markers, and TXT reports are shared by both interfaces.
+A local web application and CLI that find accounts a target Instagram profile follows but that do not follow it back. Both interfaces share the same saved accounts, Playwright sessions, SQLite history, `[checked]` markers, and TXT reports.
 
-## Docker web app
+## Ways to run
+
+The application has two supported interfaces. They use the same business logic and persistent data, but the CLI provides more interactive choices around account selection and analysis setup.
+
+| | Web UI with Docker | Local CLI |
+| --- | --- | --- |
+| Best for | Running analyses from a browser and reviewing results visually | First-time login, session refresh, account management, and terminal workflows |
+| Saved login accounts | Select or remove an existing saved account | Select, add, refresh, or delete a saved account |
+| Target profile | Enter a username, `@username`, or Instagram URL | Analyze the logged-in account or enter another username, `@username`, or URL |
+| Browser choice | Uses headless Playwright Chromium inside the backend container | Lets you choose an installed supported browser for interactive login |
+| Progress and results | Visual progress, statistics, and separate New / Previously checked lists | Terminal progress and annotated username list |
+| Reports | Timestamped TXT and standalone HTML | Timestamped TXT |
+
+Both interfaces currently run the same non-followers analysis: accounts followed by the target that do not follow it back. The additional CLI choices concern authentication, saved accounts, browser selection, and target selection; they are not separate relationship-analysis algorithms.
+
+### Option 1: Web UI with Docker
+
+This is the recommended option after at least one Instagram account has been saved through the CLI.
 
 Start the backend and UI together:
 
@@ -21,7 +38,50 @@ The Compose setup mounts the existing local storage into the backend container, 
 - `output/history/` timestamped TXT reports;
 - `reports/html/` standalone HTML reports.
 
-The web UI uses saved accounts that were already authenticated. If there are no saved accounts, or a session needs an interactive refresh, run the CLI once on the host with `python main.py`. Passwords and 2FA remain inside the visible Instagram browser flow.
+The web UI uses accounts that have already been authenticated and saved. If there are no saved accounts, or a session needs an interactive refresh, use the local CLI. Passwords and 2FA remain inside the visible Instagram browser flow and are never entered into the web UI.
+
+Stop the services with:
+
+```bash
+docker compose down
+```
+
+Recreating the containers does not remove the mounted databases, sessions, or reports.
+
+### Option 2: Local CLI
+
+Use the CLI when you need the complete interactive flow. It offers more choices during setup:
+
+- select an existing saved Instagram login;
+- add another login account;
+- refresh an expired session;
+- delete a saved account without deleting analysis history;
+- choose a supported browser for manual authentication;
+- analyze the authenticated account itself or enter a different target profile;
+- return to previous menus or cancel before starting an analysis.
+
+Install the Python dependencies first:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Then run:
+
+```bash
+python main.py
+```
+
+On Windows PowerShell, activate the environment with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+The CLI displays collection progress in the terminal and saves its timestamped TXT report to `output/history/`.
 
 ## MVP features
 
@@ -39,36 +99,9 @@ The web UI uses saved accounts that were already authenticated. If there are no 
 
 ## Requirements
 
-- Python 3.11 or newer
+- Docker with Docker Compose for the web UI, or Python 3.11 or newer for the CLI
 - An Instagram account that can access the target profile
 - Network access to Instagram
-
-## Installation
-
-Clone the repository and enter its directory. A virtual environment is recommended:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-On Windows PowerShell, activate the environment with:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-## Usage
-
-Run the interactive CLI:
-
-```bash
-python main.py
-```
-
-Select or add an authenticated Instagram account first. Then analyze that account's own profile or enter another profile as an Instagram URL, `@username`, or username.
 
 ## Authentication
 
