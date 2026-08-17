@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 
 import instaloader
 
@@ -12,7 +13,7 @@ from instagram_analyzer.browser_auth import BrowserAuthenticationError
 from instagram_analyzer.output import (
     print_numbered_usernames,
     print_summary,
-    save_usernames,
+    save_history_report,
 )
 from instagram_analyzer.profile import (
     collect_followers,
@@ -35,6 +36,7 @@ def run() -> int:
     print()
     try:
         target_username = normalize_username(input("Target profile:\n> "))
+        run_started_at = datetime.now()
         print(f"\nTarget: @{target_username}\n")
 
         loader = authenticate()
@@ -60,7 +62,13 @@ def run() -> int:
         else:
             print("\nEveryone you follow follows you back.")
 
-        output_path = save_usernames(non_followers, target_username)
+        output_path = save_history_report(
+            non_followers,
+            target_username,
+            len(following),
+            len(followers),
+            run_started_at,
+        )
         print(f"\nSaved to:\n{output_path}")
         return 0
     except (EOFError, KeyboardInterrupt):

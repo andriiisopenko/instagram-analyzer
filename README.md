@@ -11,7 +11,7 @@ A small Python CLI application that finds accounts a target Instagram profile fo
 - Reuses a local Playwright authentication state after validating it.
 - Collects following and follower usernames with progress bars.
 - Calculates non-followers with set comparison.
-- Prints a numbered result and saves an unnumbered TXT file.
+- Prints a numbered result and saves a timestamped run-history TXT report.
 - Reports expected login, access, network, and rate-limit failures cleanly.
 
 ## Requirements
@@ -127,15 +127,28 @@ Non-followers: 73
 3. @user3
 
 Saved to:
-output/non_followers_example.txt
+output/history/2026-08-17_14-37-22.txt
 ```
 
-Generated files contain one username per line without numbering:
+Every completed run creates a new report in `output/history/`. The filename uses the local run start time, and collision suffixes prevent overwriting earlier reports. Reports include the target, start time, statistics, and the complete numbered non-followers list.
+
+Example report:
 
 ```text
-@user1
-@user2
-@user3
+Instagram Non-Followers Analyzer
+
+Run started: 2026-08-17 14:37:22
+Target: @example
+
+Following: 623
+Followers: 581
+Non-followers: 73
+
+Non-followers:
+
+1. @user1
+2. @user2
+3. @user3
 ```
 
 The `output/` directory is also ignored by Git.

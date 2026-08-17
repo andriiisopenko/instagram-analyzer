@@ -178,8 +178,11 @@ def load_saved_browser_session(
     """Load a saved Playwright state and return validated Instagram cookies."""
     try:
         with sync_playwright() as playwright:
-            browser = _launch_browser(playwright, browser_option, headless=True)
+            browser: Browser | None = None
+            context: BrowserContext | None = None
+            page: Page | None = None
             try:
+                browser = _launch_browser(playwright, browser_option, headless=True)
                 context = browser.new_context(storage_state=str(session_path))
                 page = context.new_page()
                 if not _validate_authenticated_context(context, page):
@@ -190,7 +193,7 @@ def load_saved_browser_session(
             except PlaywrightError:
                 raise SavedSessionExpiredError from None
             finally:
-                browser.close()
+                _close_playwright_resources(page, context, browser)
     except SavedSessionExpiredError:
         raise
     except PlaywrightError:
@@ -207,8 +210,11 @@ def perform_manual_browser_login(
     """Launch a headed browser and wait for the user to authenticate manually."""
     try:
         with sync_playwright() as playwright:
-            browser = _launch_browser(playwright, browser_option, headless=False)
+            browser: Browser | None = None
+            context: BrowserContext | None = None
+            page: Page | None = None
             try:
+                browser = _launch_browser(playwright, browser_option, headless=False)
                 context = browser.new_context(no_viewport=True)
                 page = context.new_page()
                 page.goto(
@@ -242,8 +248,7 @@ def perform_manual_browser_login(
                 status("Session saved.")
                 return cookies
             finally:
-                if browser.is_connected():
-                    browser.close()
+                _close_playwright_resources(page, context, browser)
     except (BrowserClosedError, LoginTimeoutError):
         raise
     except PlaywrightError:
@@ -364,3 +369,24 @@ def _find_playwright_chromium() -> Path | None:
     except PlaywrightError:
         return None
     return executable_path if executable_path.is_file() else None
+
+
+def _close_playwright_resources(
+    page: Page | None,
+    context: BrowserContext | None,
+    browser: Browser | None,
+) -> None:
+    if page is not None and not page.is_closed():
+        _close_resource(page)
+    if context is not None:
+        _close_resource(context)
+    if browser is not None and browser.is_connected():
+        _close_resource(browser)
+
+
+def _close_resource(resource: Page | BrowserContext | Browser) -> None:
+    try:
+        resource.close()
+    except PlaywrightError as error:
+        if type(error).__name__ != "TargetClosedError":
+            raise
