@@ -6,6 +6,8 @@ from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
+from instagram_analyzer.history import CheckedAccount
+
 
 def print_summary(following_count: int, follower_count: int, result_count: int) -> None:
     """Print relationship totals."""
@@ -18,6 +20,12 @@ def print_numbered_usernames(usernames: Iterable[str]) -> None:
     """Print usernames as a numbered list."""
     for index, username in enumerate(usernames, start=1):
         print(f"{index}. @{username}")
+
+
+def print_checked_accounts(accounts: Iterable[CheckedAccount]) -> None:
+    """Print non-followers with cumulative history annotations."""
+    for line in format_checked_accounts(accounts):
+        print(line)
 
 
 def save_usernames(
@@ -35,7 +43,7 @@ def save_usernames(
 
 
 def save_history_report(
-    usernames: Iterable[str],
+    accounts: Iterable[CheckedAccount],
     authenticated_username: str,
     target_username: str,
     following_count: int,
@@ -47,7 +55,10 @@ def save_history_report(
     """Save a timestamped analysis report without overwriting earlier runs."""
     history_directory.mkdir(parents=True, exist_ok=True)
     output_path = _available_history_path(history_directory, run_started_at)
-    username_list = list(usernames)
+    account_list = list(accounts)
+    previously_checked_count = sum(
+        account.previously_checked for account in account_list
+    )
 
     lines = [
         "Instagram Non-Followers Analyzer",
@@ -58,21 +69,42 @@ def save_history_report(
         "",
         f"Following: {following_count}",
         f"Followers: {follower_count}",
-        f"Non-followers: {len(username_list)}",
+        f"Non-followers: {len(account_list)}",
         "",
         "Non-followers:",
         "",
     ]
-    if username_list:
-        lines.extend(
-            f"{index}. @{username}"
-            for index, username in enumerate(username_list, start=1)
-        )
+    if account_list:
+        lines.extend(format_checked_accounts(account_list))
     else:
         lines.append("None")
+    lines.extend(
+        [
+            "",
+            f"Total: {len(account_list)}",
+            f"Previously checked: {previously_checked_count}",
+            f"New: {len(account_list) - previously_checked_count}",
+        ]
+    )
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
+
+
+def format_checked_accounts(accounts: Iterable[CheckedAccount]) -> list[str]:
+    """Format account rows identically for console and text reports."""
+    account_list = list(accounts)
+    if not account_list:
+        return []
+    username_width = max(len(account.username) for account in account_list)
+    return [
+        (
+            f"{account.username:<{username_width}}  [checked]"
+            if account.previously_checked
+            else account.username
+        )
+        for account in account_list
+    ]
 
 
 def _available_history_path(

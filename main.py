@@ -12,8 +12,9 @@ from instagram_analyzer.accounts import AccountStore
 from instagram_analyzer.analyzer import find_non_followers
 from instagram_analyzer.auth import AuthenticatedAccount, select_authenticated_account
 from instagram_analyzer.browser_auth import BrowserAuthenticationError
+from instagram_analyzer.history import HistoryStore
 from instagram_analyzer.output import (
-    print_numbered_usernames,
+    print_checked_accounts,
     print_summary,
     save_history_report,
 )
@@ -35,6 +36,7 @@ def run() -> int:
 
     try:
         account_store = AccountStore()
+        history_store = HistoryStore()
         while True:
             authenticated = select_authenticated_account(account_store)
             if authenticated is None:
@@ -47,7 +49,12 @@ def run() -> int:
                 continue
 
             run_started_at = datetime.now()
-            return _run_analysis(authenticated, target_username, run_started_at)
+            return _run_analysis(
+                authenticated,
+                target_username,
+                run_started_at,
+                history_store,
+            )
     except (EOFError, KeyboardInterrupt):
         print("\nOperation cancelled.", file=sys.stderr)
     except ValueError as error:
@@ -106,6 +113,7 @@ def _run_analysis(
     authenticated: AuthenticatedAccount,
     target_username: str,
     run_started_at: datetime,
+    history_store: HistoryStore,
 ) -> int:
     print(f"\nTarget: @{target_username}")
     print(f"\nLoading @{target_username}...")
@@ -120,21 +128,30 @@ def _run_analysis(
 
     print("\nAnalyzing...")
     non_followers = sorted(find_non_followers(following, followers))
+    checked_accounts = history_store.classify_accounts(
+        target_username,
+        non_followers,
+    )
 
     print()
     print_summary(len(following), len(followers), len(non_followers))
     if non_followers:
         print()
-        print_numbered_usernames(non_followers)
+        print_checked_accounts(checked_accounts)
     else:
         print("\nEveryone you follow follows you back.")
 
     output_path = save_history_report(
-        non_followers,
+        checked_accounts,
         authenticated.username,
         target_username,
         len(following),
         len(followers),
+        run_started_at,
+    )
+    history_store.record_results(
+        target_username,
+        non_followers,
         run_started_at,
     )
     print(f"\nSaved to:\n{output_path}")

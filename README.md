@@ -12,7 +12,8 @@ A small Python CLI application that finds accounts a target Instagram profile fo
 - Selects, adds, refreshes, and deletes saved accounts from the CLI.
 - Collects following and follower usernames with progress bars.
 - Calculates non-followers with set comparison.
-- Prints a numbered result and saves a timestamped run-history TXT report.
+- Marks accounts seen in earlier runs for the same target with `[checked]`.
+- Prints an annotated result and saves a timestamped run-history TXT report.
 - Reports expected login, access, network, and rate-limit failures cleanly.
 
 ## Requirements
@@ -74,6 +75,10 @@ Account metadata is stored in `data/accounts.db`. Each account has a separate pr
 
 Deleting an account removes only its database record and session file. Analysis history is preserved. The database and session directory are ignored by Git. Session state is sensitive and must never be shared or committed.
 
+## Checked account history
+
+The separate `data/history.db` database accumulates non-follower history independently for each target profile. An account that appeared in any earlier completed run for the same target is marked `[checked]`; its first appearance has no marker. The database stores usernames, first/last seen timestamps, and the number of appearances. It does not store passwords, cookies, or Playwright state.
+
 Example:
 
 ```text
@@ -128,9 +133,9 @@ Following: 623
 Followers: 581
 Non-followers: 73
 
-1. @user1
-2. @user2
-3. @user3
+user1  [checked]
+user2
+user3  [checked]
 
 Saved to:
 output/history/2026-08-17_14-37-22.txt
@@ -153,9 +158,13 @@ Non-followers: 73
 
 Non-followers:
 
-1. @user1
-2. @user2
-3. @user3
+user1  [checked]
+user2
+user3  [checked]
+
+Total: 3
+Previously checked: 2
+New: 1
 ```
 
 The `output/` directory is also ignored by Git.
@@ -171,6 +180,7 @@ instagram-analyzer/
 │   ├── analyzer.py
 │   ├── auth.py
 │   ├── browser_auth.py
+│   ├── history.py
 │   ├── output.py
 │   ├── profile.py
 │   ├── rate_limit.py

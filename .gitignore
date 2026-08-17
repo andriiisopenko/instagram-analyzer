@@ -5,6 +5,7 @@ venv/
 .env
 sessions/
 data/accounts.db*
+data/history.db*
 data/sessions/
 output/
 .pytest_cache/
