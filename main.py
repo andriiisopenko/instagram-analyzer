@@ -29,6 +29,9 @@ def run() -> int:
     print("=" * 40)
     print()
 
+    print("Enter a profile URL, @username, or username.")
+    print("Example: https://instagram.com/example or @example")
+    print()
     try:
         target_username = normalize_username(input("Target profile:\n> "))
         print(f"\nTarget: @{target_username}\n")
@@ -95,4 +98,3 @@ def run() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run())
-
