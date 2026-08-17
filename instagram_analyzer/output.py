@@ -36,6 +36,7 @@ def save_usernames(
 
 def save_history_report(
     usernames: Iterable[str],
+    authenticated_username: str,
     target_username: str,
     following_count: int,
     follower_count: int,
@@ -52,6 +53,7 @@ def save_history_report(
         "Instagram Non-Followers Analyzer",
         "",
         f"Run started: {run_started_at:%Y-%m-%d %H:%M:%S}",
+        f"Authenticated as: @{authenticated_username}",
         f"Target: @{target_username}",
         "",
         f"Following: {following_count}",

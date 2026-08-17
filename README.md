@@ -8,7 +8,8 @@ A small Python CLI application that finds accounts a target Instagram profile fo
 - Authenticates through a visible browser launched by Playwright.
 - Supports installed Chrome, Chromium, Firefox, Brave, and Edge browsers on macOS.
 - Lets the user complete passwords, 2FA, checkpoints, and confirmations in Instagram itself.
-- Reuses a local Playwright authentication state after validating it.
+- Saves multiple Instagram accounts with one private Playwright session per account.
+- Selects, adds, refreshes, and deletes saved accounts from the CLI.
 - Collects following and follower usernames with progress bars.
 - Calculates non-followers with set comparison.
 - Prints a numbered result and saves a timestamped run-history TXT report.
@@ -45,17 +46,17 @@ Run the interactive CLI:
 python main.py
 ```
 
-Enter the target profile as an Instagram URL, `@username`, or username.
+Select or add an authenticated Instagram account first. Then analyze that account's own profile or enter another profile as an Instagram URL, `@username`, or username.
 
 ## Authentication
 
 Authentication uses this flow:
 
-1. A saved Playwright Instagram session is validated and reused when possible.
-2. If no valid session exists, the application detects supported browsers installed on the Mac.
-3. The selected browser opens Instagram in a visible Playwright-controlled window.
-4. The user completes the entire login manually in Instagram.
-5. The authenticated browser state is saved and transferred to Instaloader for the existing analysis.
+1. Saved accounts are loaded from the local SQLite database.
+2. The user can select, add, or delete an account.
+3. A selected account's Playwright session is validated and reused when possible.
+4. New or expired sessions use the visible manual browser-login flow.
+5. The user chooses the authenticated account's own profile or enters another target.
 
 The terminal never asks for or stores an Instagram password or 2FA code. The application does not autofill credentials, read cookies from an existing browser profile, or bypass Instagram security checks.
 
@@ -69,9 +70,9 @@ The terminal never asks for or stores an Instagram password or 2FA code. The app
 
 The application uses Playwright and supports Google Chrome, Chromium, Firefox, Brave Browser, and Microsoft Edge when detected. If none is installed, Playwright-managed Chromium can be installed with `python -m playwright install chromium`. Safari is not offered because Playwright cannot reliably launch the installed Safari application. No Full Disk Access or browser cookie database access is required.
 
-After successful login, Playwright saves the browser authentication state to `sessions/instagram_storage_state.json` with restricted permissions. Future launches create an isolated Playwright context from that state, validate it with Instagram, and continue without another login when it remains valid. Expired state is removed and replaced after a new manual login. The `sessions/` directory is ignored by Git.
+Account metadata is stored in `data/accounts.db`. Each account has a separate private Playwright state in `data/sessions/<username>.json`. The database contains only the username, session filename, and timestamps; it never contains passwords, cookies, or raw storage state. Expired sessions keep their account record and can be replaced through the same manual browser-login flow. The previous `sessions/instagram_storage_state.json` is migrated automatically when it is valid and no accounts have been saved yet.
 
-The saved state contains sensitive browser authentication data. Never share or commit it.
+Deleting an account removes only its database record and session file. Analysis history is preserved. The database and session directory are ignored by Git. Session state is sensitive and must never be shared or committed.
 
 Example:
 
@@ -80,33 +81,38 @@ Example:
 Instagram Non-Followers Analyzer
 ========================================
 
+Saved Instagram accounts:
+
+1. @my_account
+
+A. Add another account
+D. Delete saved account
+0. Exit
+
+> 1
+
+Using @my_account
+
+Checking saved session...
+Session is valid.
+
+Logged in as: @my_account
+
+Profile to analyze:
+
+1. @my_account
+2. Enter another profile
+0. Back
+
+> 2
+
+Enter a profile URL, @username, or username.
+Example: https://instagram.com/example or @example
+
 Target profile:
 > https://instagram.com/example
 
 Target: @example
-
-Checking saved session...
-No valid saved session found.
-
-Choose browser:
-
-1. Google Chrome
-2. Firefox
-3. Brave Browser
-0. Cancel
-
-> 1
-
-Browser opened.
-
-Log in to Instagram manually in the browser.
-Complete any 2FA, security check, checkpoint, or confirmation requested by Instagram.
-
-Waiting for successful Instagram login...
-Instagram login successful.
-Saving session...
-Session saved.
-Authenticated as @my_account.
 
 Loading @example...
 
@@ -138,6 +144,7 @@ Example report:
 Instagram Non-Followers Analyzer
 
 Run started: 2026-08-17 14:37:22
+Authenticated as: @my_account
 Target: @example
 
 Following: 623
@@ -160,6 +167,7 @@ instagram-analyzer/
 ├── main.py
 ├── instagram_analyzer/
 │   ├── __init__.py
+│   ├── accounts.py
 │   ├── analyzer.py
 │   ├── auth.py
 │   ├── browser_auth.py
@@ -168,6 +176,7 @@ instagram-analyzer/
 │   ├── rate_limit.py
 │   └── utils.py
 ├── tests/
+├── data/                  # Local database and private sessions (Git-ignored)
 ├── requirements.txt
 ├── .gitignore
 ├── README.md
