@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 import instaloader
 from tqdm import tqdm
@@ -15,21 +15,38 @@ def resolve_profile(
     return instaloader.Profile.from_username(loader.context, username)
 
 
-def collect_following(profile: instaloader.Profile) -> set[str]:
+ProgressCallback = Callable[[int, int | None], None]
+
+
+def collect_following(
+    profile: instaloader.Profile,
+    *,
+    progress: ProgressCallback | None = None,
+    show_progress: bool = True,
+) -> set[str]:
     """Collect usernames followed by the target profile."""
     return _collect_usernames(
         profile.get_followees(),
         description="Following",
         total=profile.followees,
+        progress=progress,
+        show_progress=show_progress,
     )
 
 
-def collect_followers(profile: instaloader.Profile) -> set[str]:
+def collect_followers(
+    profile: instaloader.Profile,
+    *,
+    progress: ProgressCallback | None = None,
+    show_progress: bool = True,
+) -> set[str]:
     """Collect usernames following the target profile."""
     return _collect_usernames(
         profile.get_followers(),
         description="Followers",
         total=profile.followers,
+        progress=progress,
+        show_progress=show_progress,
     )
 
 
@@ -38,15 +55,22 @@ def _collect_usernames(
     *,
     description: str,
     total: int | None,
+    progress: ProgressCallback | None,
+    show_progress: bool,
 ) -> set[str]:
-    return {
-        related_profile.username.lower()
-        for related_profile in tqdm(
+    usernames: set[str] = set()
+    for count, related_profile in enumerate(
+        tqdm(
             profiles,
             desc=description,
             total=total,
             unit="account",
             dynamic_ncols=True,
-        )
-    }
-
+            disable=not show_progress,
+        ),
+        start=1,
+    ):
+        usernames.add(related_profile.username.lower())
+        if progress is not None:
+            progress(count, total)
+    return usernames

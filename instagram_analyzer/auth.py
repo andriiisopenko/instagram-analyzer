@@ -71,6 +71,36 @@ def create_loader() -> instaloader.Instaloader:
     )
 
 
+def authenticate_saved_account(
+    account_store: AccountStore,
+    account: SavedAccount,
+) -> AuthenticatedAccount:
+    """Authenticate one saved account without starting an interactive login flow.
+
+    This is used by non-interactive frontends such as the web API. The CLI keeps
+    its existing re-authentication behavior when a saved session has expired.
+    """
+    session_path = account_store.session_path(account)
+    if not session_path.is_file():
+        raise SavedSessionExpiredError
+
+    browsers = detect_installed_browsers()
+    if not browsers:
+        raise NoSupportedBrowserError
+
+    cookies: list[CookieData] = []
+    try:
+        cookies = load_saved_browser_session(browsers[0], session_path)
+        loader, authenticated_username = _create_authenticated_loader(cookies)
+    finally:
+        cookies.clear()
+
+    if authenticated_username.casefold() != account.username.casefold():
+        raise AccountMismatchError(account.username, authenticated_username)
+    account_store.mark_used(account.id)
+    return AuthenticatedAccount(loader, authenticated_username)
+
+
 def select_authenticated_account(
     account_store: AccountStore,
     *,

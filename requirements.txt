@@ -1,4 +1,6 @@
 instaloader>=4.12,<5
 playwright>=1.62,<2
 tqdm>=4.66,<5
+fastapi>=0.116,<1
+uvicorn[standard]>=0.35,<1
 pytest>=8,<9

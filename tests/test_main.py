@@ -7,8 +7,13 @@ from pytest import CaptureFixture, MonkeyPatch
 def test_cli_shows_supported_target_formats(
     monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:
-    input_mock = Mock(return_value="invalid username")
+    input_mock = Mock(side_effect=["2", "invalid username"])
     monkeypatch.setattr("builtins.input", input_mock)
+    monkeypatch.setattr(
+        main,
+        "select_authenticated_account",
+        Mock(return_value=Mock(username="login_account")),
+    )
 
     exit_code = main.run()
 

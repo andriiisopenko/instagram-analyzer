@@ -1,6 +1,27 @@
-# Instagram Non-Followers Analyzer
+# Instagram Analyzer
 
-A small Python CLI application that finds accounts a target Instagram profile follows but that do not follow it back. It uses [Instaloader](https://instaloader.github.io/) and does not use the official Instagram API.
+A local web application and CLI that find accounts a target Instagram profile follows but that do not follow it back. The existing Instaloader, Playwright sessions, SQLite history, `[checked]` markers, and TXT reports are shared by both interfaces.
+
+## Docker web app
+
+Start the backend and UI together:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:8080](http://localhost:8080).
+
+The default container user matches a standard macOS account. On Linux or a Mac with a different numeric user ID, start with `DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose up --build` so newly generated files remain editable by the host user.
+
+The Compose setup mounts the existing local storage into the backend container, so recreating containers does not remove:
+
+- `data/accounts.db` and `data/history.db`;
+- `data/sessions/` saved Playwright sessions;
+- `output/history/` timestamped TXT reports;
+- `reports/html/` standalone HTML reports.
+
+The web UI uses saved accounts that were already authenticated. If there are no saved accounts, or a session needs an interactive refresh, run the CLI once on the host with `python main.py`. Passwords and 2FA remain inside the visible Instagram browser flow.
 
 ## MVP features
 
@@ -173,6 +194,15 @@ The `output/` directory is also ignored by Git.
 
 ```text
 instagram-analyzer/
+├── backend/
+│   ├── api.py             # Saved accounts, analysis jobs, progress, results, reports
+│   └── Dockerfile
+├── ui/
+│   ├── index.html
+│   ├── styles.css
+│   ├── app.js
+│   ├── nginx.conf
+│   └── Dockerfile
 ├── main.py
 ├── instagram_analyzer/
 │   ├── __init__.py
@@ -184,9 +214,13 @@ instagram-analyzer/
 │   ├── output.py
 │   ├── profile.py
 │   ├── rate_limit.py
+│   ├── service.py         # Shared non-interactive analysis orchestration
 │   └── utils.py
 ├── tests/
-├── data/                  # Local database and private sessions (Git-ignored)
+├── data/                  # Persistent databases and private sessions (Git-ignored)
+├── output/history/        # Existing TXT reports (Git-ignored)
+├── reports/html/          # Standalone HTML reports (Git-ignored)
+├── docker-compose.yml
 ├── requirements.txt
 ├── .gitignore
 ├── README.md
