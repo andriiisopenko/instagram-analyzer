@@ -18,6 +18,18 @@ def resolve_profile(
 ProgressCallback = Callable[[int, int | None], None]
 
 
+class IncompleteRelationshipDataError(ValueError):
+    """Raised when the relationship list disagrees with the profile count."""
+
+    def __init__(self, description: str, expected: int, received: int) -> None:
+        super().__init__(
+            f"Instagram returned {received} entries in the {description.lower()} list, but the "
+            f"profile reports {expected}. The analysis was stopped without saving "
+            "a report because the relationship list may be incomplete. "
+            "Instagram may be restricting relationship requests; wait and try again later."
+        )
+
+
 def collect_following(
     profile: instaloader.Profile,
     *,
@@ -73,4 +85,6 @@ def _collect_usernames(
         usernames.add(related_profile.username.lower())
         if progress is not None:
             progress(count, total)
+    if total is not None and len(usernames) != total:
+        raise IncompleteRelationshipDataError(description, total, len(usernames))
     return usernames

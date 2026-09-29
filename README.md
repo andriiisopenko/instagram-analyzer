@@ -93,7 +93,7 @@ The CLI displays collection progress in the terminal and saves its timestamped T
 - Lets the user complete passwords, 2FA, checkpoints, and confirmations in Instagram itself.
 - Saves multiple Instagram accounts with one private Playwright session per account.
 - Selects, adds, refreshes, and deletes saved accounts from the CLI.
-- Collects following and follower usernames with progress bars.
+- Collects following and follower usernames through Instagram's browser lists with page-by-page progress.
 - Calculates non-followers with set comparison.
 - Marks accounts seen in earlier runs for the same target with `[checked]`.
 - Prints an annotated result and saves a timestamped run-history TXT report.
@@ -175,13 +175,13 @@ Target profile:
 
 Target: @example
 
-Loading @example...
-
-Collecting following...
-Following: 100%|████████████████| 623/623
-
-Collecting followers...
-Followers: 100%|████████████████| 581/581
+Loading @example in the browser...
+Following: 12 accounts collected
+...
+Following: 623 accounts collected
+Followers: 12 accounts collected
+...
+Followers: 581 accounts collected
 
 Analyzing...
 
@@ -245,6 +245,7 @@ instagram-analyzer/
 │   ├── analyzer.py
 │   ├── auth.py
 │   ├── browser_auth.py
+│   ├── browser_relationships.py
 │   ├── history.py
 │   ├── output.py
 │   ├── profile.py
@@ -264,9 +265,11 @@ instagram-analyzer/
 
 ## Rate limits and account safety
 
-The application retains Instaloader's built-in rate limiting and adds only a small delay between the two main collection operations. It does not bypass Instagram restrictions or retry aggressively.
+The application validates saved sessions with Instaloader, then collects relationship pages from Instagram's own browser interface. It keeps each username once, pauses briefly between pages, makes a limited second pass if the list is short, and stops if Instagram fails to provide a final page. Progress updates appear only when new accounts are collected.
 
 Instagram may restrict automated requests. This application cannot guarantee that an account will never encounter temporary rate limiting. Use it conservatively, avoid repeated scans in a short period, and stop if Instagram asks you to verify account activity.
+
+If a completed browser list differs substantially from the displayed profile count, the analysis stops without saving a report. The displayed count can lag the list by one account. A previous report that shows zero collected accounts despite positive profile counts is incomplete and should not be used.
 
 ## Tests
 

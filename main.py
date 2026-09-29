@@ -12,18 +12,13 @@ from instagram_analyzer.accounts import AccountStore
 from instagram_analyzer.analyzer import find_non_followers
 from instagram_analyzer.auth import AuthenticatedAccount, select_authenticated_account
 from instagram_analyzer.browser_auth import BrowserAuthenticationError
+from instagram_analyzer.browser_relationships import collect_browser_relationships
 from instagram_analyzer.history import HistoryStore
 from instagram_analyzer.output import (
     print_checked_accounts,
     print_summary,
     save_history_report,
 )
-from instagram_analyzer.profile import (
-    collect_followers,
-    collect_following,
-    resolve_profile,
-)
-from instagram_analyzer.rate_limit import pause_between_operations
 from instagram_analyzer.utils import normalize_username
 
 
@@ -54,6 +49,7 @@ def run() -> int:
                 target_username,
                 run_started_at,
                 history_store,
+                account_store,
             )
     except (EOFError, KeyboardInterrupt):
         print("\nOperation cancelled.", file=sys.stderr)
@@ -114,17 +110,26 @@ def _run_analysis(
     target_username: str,
     run_started_at: datetime,
     history_store: HistoryStore,
+    account_store: AccountStore,
 ) -> int:
     print(f"\nTarget: @{target_username}")
-    print(f"\nLoading @{target_username}...")
-    target_profile = resolve_profile(authenticated.loader, target_username)
+    saved_account = account_store.get_by_username(authenticated.username)
+    if saved_account is None:
+        raise ValueError("The authenticated account has no saved browser session.")
 
-    print("\nCollecting following...")
-    following = collect_following(target_profile)
-    pause_between_operations()
+    print(f"\nLoading @{target_username} in the browser...")
+    last_reported: dict[str, int] = {}
 
-    print("\nCollecting followers...")
-    followers = collect_followers(target_profile)
+    def collection_progress(kind: str, current: int, total: int | None) -> None:
+        if current > last_reported.get(kind, 0):
+            print(f"{kind.capitalize()}: {current} accounts collected")
+            last_reported[kind] = current
+
+    following, followers = collect_browser_relationships(
+        account_store.session_path(saved_account),
+        target_username,
+        progress=collection_progress,
+    )
 
     print("\nAnalyzing...")
     non_followers = sorted(find_non_followers(following, followers))

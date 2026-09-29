@@ -10,10 +10,9 @@ from pathlib import Path
 from instagram_analyzer.accounts import AccountStore
 from instagram_analyzer.analyzer import find_non_followers
 from instagram_analyzer.auth import authenticate_saved_account
+from instagram_analyzer.browser_relationships import collect_browser_relationships
 from instagram_analyzer.history import CheckedAccount, HistoryStore
 from instagram_analyzer.output import save_history_report, save_html_report
-from instagram_analyzer.profile import collect_followers, collect_following, resolve_profile
-from instagram_analyzer.rate_limit import pause_between_operations
 from instagram_analyzer.utils import normalize_username
 
 
@@ -69,29 +68,19 @@ def run_saved_account_analysis(
     authenticated = authenticate_saved_account(account_store, saved_account)
 
     _progress(progress, "loading_profile", 15, f"Loading @{target_username}")
-    target_profile = resolve_profile(authenticated.loader, target_username)
 
-    def following_progress(current: int, total: int | None) -> None:
-        percent = _collection_percent(22, 25, current, total)
-        _progress(progress, "collecting_following", percent, "Collecting following")
+    def relationship_progress(kind: str, current: int, total: int | None) -> None:
+        if kind == "following":
+            percent = _collection_percent(22, 25, current, total)
+            _progress(progress, "collecting_following", percent, "Collecting following")
+        else:
+            percent = _collection_percent(52, 28, current, total)
+            _progress(progress, "collecting_followers", percent, "Collecting followers")
 
-    _progress(progress, "collecting_following", 20, "Collecting following")
-    following = collect_following(
-        target_profile,
-        progress=following_progress,
-        show_progress=False,
-    )
-    pause_between_operations()
-
-    def followers_progress(current: int, total: int | None) -> None:
-        percent = _collection_percent(52, 28, current, total)
-        _progress(progress, "collecting_followers", percent, "Collecting followers")
-
-    _progress(progress, "collecting_followers", 50, "Collecting followers")
-    followers = collect_followers(
-        target_profile,
-        progress=followers_progress,
-        show_progress=False,
+    following, followers = collect_browser_relationships(
+        account_store.session_path(saved_account),
+        target_username,
+        progress=relationship_progress,
     )
 
     _progress(progress, "analyzing", 84, "Comparing followers and following")
